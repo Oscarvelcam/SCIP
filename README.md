@@ -4,12 +4,12 @@ _n.b._ End-to-end script to analyze paired-end DNA sequencing data from SCIP exp
 
 Dependecies:
 
-[bwa](https://sourceforge.net/projects/bio-bwa/files/)
+[bwa](https://sourceforge.net/projects/bio-bwa/files/)  
 [picard](http://broadinstitute.github.io/picard/picard-metric-definitions.html#DuplicationMetrics/)  
-[samtools](http://www.htslib.org/)
-[delly](https://github.com/dellytools/delly)
-[bcftools](http://www.htslib.org/)
-[bedtools](https://bedtools.readthedocs.io/en/latest/content/bedtools-suite.html)
+[samtools](http://www.htslib.org/)  
+[delly](https://github.com/dellytools/delly)  
+[bcftools](http://www.htslib.org/)  
+[bedtools](https://bedtools.readthedocs.io/en/latest/content/bedtools-suite.html) 
 
 ## Step 1. Create folder structure to store the output
 ```
