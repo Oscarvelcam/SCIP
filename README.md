@@ -109,5 +109,30 @@ done
 
 The above selects all the discordant reads from the sample and indexes the file to be uploaded as tracks on any genome browser (e.g. IGV)
 
+## Step 7. Create a variant call file (VCF) from the binary output of delly using [bcftools](http://www.htslib.org/)  
 
+```
+cd  $(pwd)/delly
+for i in *.bcf
+do
+        BASENAME=${i%%.bcf}
+        echo $BASENAME
+        bcftools convert $BASENAME.bcf -o $BASENAME.vcf
+done
+```
+The above selects all the discordant reads from the sample and indexes the file to be uploaded as tracks on any genome browser (e.g. IGV)
 
+## Step 8. Filter the list of putative integration sites based on quality and type of discordant reads supporting it 
+
+```
+for i in *.vcf
+do
+        BASENAME=${i%%.vcf}
+        echo $BASENAME
+        less $BASENAME.vcf| grep "VEC39079" | grep -v "IMPRECISE" | grep -v "LowQual" | grep -v "##" | cut -f8 | cut -d ";" -f5,6 > $BASENAME.bed
+done
+```
+
+```
+Rscript SCIP_2_Ideogram.R path2input/file.bed output_file.txt
+```
