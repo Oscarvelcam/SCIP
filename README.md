@@ -26,6 +26,8 @@ DIR_FASTQS="/PATH/TO/FASTQS"
 FILES=(SPACE SEPARATED LIST OF GZIPPED FASTQ BASENAMES I.E. WITHOUT _1.fastq.gz or _2.fastq.gz)
 DIR_GENOMES="/PATH/TO/GENOMES"
 ```
+Specific option with precise file paths 
+```
 RF_PICR=/scratch/gnnxm/Repositories/Pharma/Genomes/CriGri-PICR/CriGri-PICR_Original/ncbi-genomes-2022-11-16/GCF_003668045.1_CriGri-PICR_genomic.fna
 RF_PICR_VEC39079=/scratch/gnnxm/Repositories/Pharma/Genomes/CriGri-PICR/Merged_CriGri-PICR_VEC_39079/Merged_VEC_39079_GCF_003668045.1_CriGri-PICR_genomic.fna
 RF_PICRH=/scratch/gnnxm/Repositories/Pharma/Genomes/CriGri-PICRH/CriGri-PICRH-1.0_Original/ncbi-genomes-2022-04-08/GCF_003668045.3_CriGri-PICRH-1.0_genomic.fna
@@ -35,24 +37,12 @@ RF_CHO_Bayer_hifiasm=/scratch_raid/gnnxm/LSC_Location/Repositories/Pharma/Genome
 RF_CHO_Bayer_ragoo=/scratch_raid/gnnxm/LSC_Location/Repositories/Pharma/Genomes/CHO_Bayer/scaffolding/asm_ragoo.fasta
 ```
 
-
+```
 for i in "${FILES[@]}"
   do
-    java -jar /usr/local/bin/Trimmomatic-0.39/trimmomatic-0.39.jar \
-    PE \
-    -threads 12 \
-    -phred33 \
-    ${DIR}/${i}_1.fastq.gz \
-    ${DIR}/${i}_2.fastq.gz \
-    ${DIR}/${i}_1_P.fastq.gz \
-    ${DIR}/${i}_1_U.fastq.gz \
-    ${DIR}/${i}_2_P.fastq.gz \
-    ${DIR}/${i}_2_U.fastq.gz \
-    ILLUMINACLIP:${DIR}/adapters.fa:2:30:10:2:keepBothReads LEADING:3 TRAILING:3 MINLEN:30
+    bwa mem -t 20 $RF_PICRH_VEC39079 $MATE1 $MATE2 | samtools sort -@10 -o  $(pwd)/$BASENAME.sorted.bam
   done
 ```
-
-
 
 The above will perform the following:
 
@@ -62,7 +52,7 @@ Remove leading low quality or N bases (below quality 3) (`LEADING:3`)
 Remove trailing low quality or N bases (below quality 3) (`TRAILING:3`)
 Drop reads below the 30 bases long (`MINLEN:30`)
 
-## Step 2. Build index and map reads using [bowtie](http://bowtie-bio.sourceforge.net/manual.shtml)
+## Step 2. Mark duplicates on the sorted generated .bam files using [picard](http://broadinstitute.github.io/picard/picard-metric-definitions.html#DuplicationMetrics) 
 
 Index genome assembly fasta:
 
