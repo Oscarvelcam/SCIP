@@ -5,7 +5,7 @@ _n.b._ End-to-end script to analyze paired-end DNA sequencing data from SCIP exp
 Dependecies:
 
 [bwa](https://sourceforge.net/projects/bio-bwa/files/)
-[picard](http://broadinstitute.github.io/picard/picard-metric-definitions.html#DuplicationMetrics)  
+[picard](http://broadinstitute.github.io/picard/picard-metric-definitions.html#DuplicationMetrics/)  
 [samtools](http://www.htslib.org/)
 [delly](https://github.com/dellytools/delly)
 [bcftools](http://www.htslib.org/)
@@ -18,7 +18,7 @@ mkdir $(pwd)/bam_non_dup_picard/delly
 mkdir $(pwd)/bam_non_dup_picard/discordants
 ```
 
-## Step 1. Map and sort reads to the merged genomes using [bwa](https://sourceforge.net/projects/bio-bwa/files/)
+## Step 2. Map and sort reads to the merged genomes using [bwa](https://sourceforge.net/projects/bio-bwa/files/)
 
 General option
 ```
@@ -46,111 +46,68 @@ for i in "${FILES[@]}"
 
 The above will perform the following:
 
-Remove adapters (`ILLUMINACLIP:adapters.fa:2:30:10`)
-Note the additional `:2` in front of `keepBothReads` this is the minimum adapter length in palindrome mode
-Remove leading low quality or N bases (below quality 3) (`LEADING:3`)
-Remove trailing low quality or N bases (below quality 3) (`TRAILING:3`)
-Drop reads below the 30 bases long (`MINLEN:30`)
+Aligned the paired-end reads to the merged reference genome from the options above using bwa-mem
+Sort the resulting bam file based on position
 
-## Step 2. Mark duplicates on the sorted generated .bam files using [picard](http://broadinstitute.github.io/picard/picard-metric-definitions.html#DuplicationMetrics) 
+## Step 3. Mark duplicates on the sorted bam files using [picard](http://broadinstitute.github.io/picard/picard-metric-definitions.html#DuplicationMetrics) 
 
-Index genome assembly fasta:
-
+Detects and tags PCR and optical duplicates in the sorted bam file
 ```
-INDEX="SHORT IDENTIFIER FOR REFERENCE GENOME ASSEMBLY"
-REF="REFERENCE GENOME ASSEMBLY FASTA FILE NAME"
-DIR="/PATH/TO/REFERENCE/FASTA"
-cd ${DIR}
-bowtie-build ${REF} ${INDEX}
+for i in *.bam
+do
+        BASENAME=${i%%.bam}                           
+        echo $BASENAME
+        picard MarkDuplicates VALIDATION_STRINGENCY=LENIENT I=${BASENAME}.bam O=$(pwd)/bam_non_dup_picard/${BASENAME}_nodups.bam M=$(pwd)/bam_non_dup_picard/${BASENAME}_marked_dup_metrics.txt TMP_DIR= /scratch_raid/gnnxm/Tempo/
+
+done
 ```
 
-Map ATAC-seq reads to indexed genome assembly:
+## Step 4. Create a stats summary of the bam file and estimes the average insert size for each library
 
 ```
-INDEX="/PATH/TO/INDEX"
-DIR="/PATH/TO/TRIMMED/FASTQS"
-FILES=(SPACE SEPARATED LIST OF TRIMMED FASTQ BASENAMES I.E. WITHOUT _1_P.fastq or _2_P.fastq)
+rm *.bam
+cd $(pwd)/bam_non_dup_picard/
 
-for i in "${FILES[@]}"
-  do
-    gunzip ${DIR}/${i}_1_P.fastq.gz
-    gunzip ${DIR}/${i}_2_P.fastq.gz
-    bowtie ${INDEX} -1 ${DIR}/${i}_1_P.fastq -2 ${DIR}/${i}_2_P.fastq -S ${DIR}/${i}.sam -t -p 24 -v 2 -X 1000 --best --strata -m 1
-    gzip ${DIR}/${i}_1_P.fastq
-    gzip ${DIR}/${i}_2_P.fastq
-    samtools sort -O 'bam' -o ${DIR}/${i}_sorted.bam -T tmp -@ 24 ${DIR}/${i}.sam
-    rm ${DIR}/${i}.sam
-  done
+for i in *.bam
+do
+        echo $i
+        samtools stats $i | grep "insert size average:" | cut -f3 >> bam_average_insert_size.tsv
+done
 ```
 
-In addtion to mapping the ATAC-seq reads, the above will perform the following:
-
-`gunzip` fastqs prior to running `bowtie`
-`gzip` fastqs after mapping
-Convert output sam file to bam, sort bam, and delete sam file (`samtools` and `rm`)
-
-## Step 3. Remove PCR and optical duplicates from bam using [picard](http://broadinstitute.github.io/picard/picard-metric-definitions.html#DuplicationMetrics)
+## Step 5. Calling interchromosomal translocations is performed using [delly](https://github.com/dellytools/delly)
 
 ```
-DIR="/PATH/TO/SORTED/BAMS"
-FILES=(SPACE SEPARATED LIST OF BAM BASENAMES I.E. WITHOUT _sorted.bam)
+for i in *.bam
+do
+        BASENAME=${i%%.bam}
+        echo $BASENAME
+        T=${BASENAME}.bam
+        echo -e  $T "\t"
+        samtools index $i
+        delly call --svtype BND \ 
+                    -o $(pwd)/delly/$BASENAME.bcf \
+                    -g $RF_PICRH_VEC39079 $T
 
-for i in "${FILES[@]}"
-  do
-    java -Xmx48G -jar picard.jar MarkDuplicates INPUT=${DIR}/${i}_sorted.bam OUTPUT=${DIR}/${i}_rmdup.bam METRICS_FILE=${DIR}/${i}_METRICS_FILE.txt REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT
-  done
+done
 ```
 
-## Step 4. Merge bam technical replicates
+The above calls all the interchromosomal translocations in the sample, however, we just care about the translocations where the transfected vector is involved, (e.g. VEC39079) and these will be filtered in step 8
+ 
+## Step 6. Fetch all discordants reads from the bam file using [samtools](http://www.htslib.org/)
 
 ```
-DIR="/PATH/TO/REMOVED/DUPLICATE/BAMS"
-LINE="LINE NAME E.G. B73"
-TIS="NAME OF TISSUE E.G. leaf"
-
-samtools merge ${DIR}/${LINE}_${TIS}.bam -@ 12 ${DIR}/FILE1_rmdup.bam ${DIR}/FILE2_rmdup.bam ${DIR}/FILE3_rmdup.bam
+for i in *.bam
+do
+        BASENAME=${i%%.bam}
+        echo $BASENAME
+        echo $i
+        samtools view -b -F 1294 $i > $(pwd)/discordants/$BASENAME.discordants.bam
+        samtools index $(pwd)/discordants/$BASENAME.discordants.bam
+done
 ```
 
-The above requires the user to specify the removed duplicate bam files. Repeat code for additional tissues.
+The above selects all the discordant reads from the sample and indexes the file to be uploaded as tracks on any genome browser (e.g. IGV)
 
-## Step 5. Call peaks using [macs2](https://github.com/macs3-project/MACS)
 
-```
-DIR="/PATH/TO/MERGED/BAM"
-FILES=(SPACE SEPARATED LIST OF MERGED REMOVED BAM BASENAMES I.E. WITHOUT .bam)
 
-for i in "${FILES[@]}"
-  do
-    macs2 callpeak \
-    --verbose 3 \
-    --treatment ${DIR}/${i}.bam \
-    --format BAMPE \
-    --name ${i} \
-    --outdir ${DIR} \
-    --bdg \
-    --qvalue 0.01 \
-    --gsize 2.4e9 \
-    --keep-dup all \
-    --tempdir ${DIR}/temp
-  done
-```
-
-The above is uses a false-discovery rate (`--qvalue`) of 0.01 estimated genome size of 2.4 Gbp for _Zea mays_ (`--gsize`).
-
-## Assess Fraction of Reads in Peaks (FRiP) score
-
-"_The fraction of reads in called peak regions (FRiP score) should be >0.3, though values greater than 0.2 are acceptable_". [ENCODE](https://www.encodeproject.org/atac-seq/)
-
-```
-DIR="/PATH/TO/MERGED/BAM/AND/NARROWPEAKS"
-BAM="BASENAME OF BAM I.E. WITHOUT .bam"
-PEAK="BASENAME OF NARROWPEAK I.E. WITHOUT .narrowPeak"
-
-total_reads=$(samtools view -@ 24 -c ${BAM}.bam)
-reads_in_peaks=$(bedtools sort -i ${PEAK}.narrowPeak \
-| bedtools merge -i stdin \
-| bedtools intersect -u -nonamecheck -a ${BAM}.bam -b stdin -ubam \
-| samtools view -@ 24 -c)
-FRiP=$(awk "BEGIN {print "${reads_in_peaks}"/"${total_reads}"}")
-echo "tissue=${i}, total_reads=${total_reads}, reads_in_peaks=${reads_in_peaks}, FRiP=${FRiP}" >> ${BAM}_frip.txt
-```
