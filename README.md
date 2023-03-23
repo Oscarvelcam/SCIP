@@ -136,3 +136,19 @@ done
 ```
 Rscript SCIP_2_Ideogram.R path2input/file.bed output_file.txt
 ```
+
+```
+\begin{itemize}\raggedright
+  \item R version 4.2.2 (2022-10-31), \verb|aarch64-apple-darwin22.1.0|
+  \item Running under: \verb|macOS Ventura 13.2|
+  \item Matrix products: default
+  \item LAPACK: \verb|/opt/homebrew/Cellar/r/4.2.2_1/lib/R/lib/libRlapack.dylib|
+  \item Base packages: base, datasets, graphics, grDevices, methods, stats,
+    utils
+  \item Loaded via a namespace (and not attached): assertthat~0.2.1, cli~3.4.1,
+    compiler~4.2.2, DBI~1.1.3, dplyr~1.0.10, fansi~1.0.3, generics~0.1.3,
+    glue~1.6.2, lifecycle~1.0.3, magrittr~2.0.3, pillar~1.8.1, pkgconfig~2.0.3,
+    purrr~0.3.5, R6~2.5.1, rlang~1.0.6, rstudioapi~0.14, tibble~3.1.8,
+    tidyr~1.2.1, tidyselect~1.2.0, tools~4.2.2, utf8~1.2.2, vctrs~0.5.0
+\end{itemize}
+```
