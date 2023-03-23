@@ -3,7 +3,6 @@ require(RIdeogram)
 #> Loading required package: RIdeogram
 
 # Load the files necessary for the display of the ideogram data 
-data(human_karyotype, package="RIdeogram")
 data(gene_density, package="RIdeogram")
 data(Random_RNAs_500, package="RIdeogram")
 
